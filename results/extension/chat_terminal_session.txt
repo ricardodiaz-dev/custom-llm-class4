@@ -1,0 +1,9 @@
+number of parameters: 0.12M
+Tiny language model: short continuations, not a general assistant.
+Each prompt starts fresh. Context: 48 tokens. Type /quit to exit.
+You: Model: developed .
+You: Model: above the .
+You: Model: bird .
+You: Model: the new item .
+Unknown words: board, variance
+You: Saved transcript: results/extension/chat_terminal_transcript.json

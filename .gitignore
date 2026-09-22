@@ -1,0 +1,13 @@
+__pycache__/
+.ipynb_checkpoints/
+.venv/
+.DS_Store
+
+# Training material for Experiment B is generated, not stored.
+# Reproduce it with: python build_extension_corpus.py
+/corpus/*
+!/corpus/README.md
+
+# Raw run folders and ZIPs stay local; published evidence lives in results/.
+/llm_runs/
+*.zip

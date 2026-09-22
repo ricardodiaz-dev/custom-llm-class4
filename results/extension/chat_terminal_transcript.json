@@ -1,0 +1,41 @@
+{
+  "model": "results/extension/model.pt",
+  "model_sha256": "28f5aa32e559951cf74204dd89595496f912623f52358aef73ba612280ae18f6",
+  "completed_steps": 3000,
+  "fresh_context_per_prompt": true,
+  "temperature": 0.8,
+  "max_tokens": 24,
+  "turns": [
+    {
+      "prompt": "the parcel is not developed.it is",
+      "seed": 2026,
+      "response": "developed .",
+      "unknown_prompt_words": [],
+      "prompt_truncated": false
+    },
+    {
+      "prompt": "the roof is above the floor.the floor is",
+      "seed": 2027,
+      "response": "above the .",
+      "unknown_prompt_words": [],
+      "prompt_truncated": false
+    },
+    {
+      "prompt": "a robin is a bird.a salmon is a",
+      "seed": 2028,
+      "response": "bird .",
+      "unknown_prompt_words": [],
+      "prompt_truncated": false
+    },
+    {
+      "prompt": "the design review board approved the variance",
+      "seed": 2029,
+      "response": "the new item .",
+      "unknown_prompt_words": [
+        "board",
+        "variance"
+      ],
+      "prompt_truncated": false
+    }
+  ]
+}

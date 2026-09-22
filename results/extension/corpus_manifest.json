@@ -1,0 +1,43 @@
+{
+  "files": [
+    {
+      "file": "categories_and_kinds.md",
+      "bytes": 3353,
+      "sha256": "0f8566fa799f07b1c0a7a16663f6729d5c3ef17a39cf391414f0877913fb54b2",
+      "warnings": [],
+      "characters": 3353,
+      "passages": 135,
+      "unique_passages": 135,
+      "preview": "# Categories and kinds: a specific thing belongs to a general class.\nthe bus is a vehicle .\nthe acre is a measure .\nthe goat is a animal .\nevery trout is a fish .\nthe drill is a tool .\nthe sparrow is a bird .\nevery truck is a vehicle .\nthe cedar is a tree .\na carrot is a vegetable .\na foal grows int"
+    },
+    {
+      "file": "negation_and_correction.md",
+      "bytes": 9097,
+      "sha256": "55425f1f466376478969f2e362818b6483bb41b3d2cd91f1dc720f3af4c729a3",
+      "warnings": [],
+      "characters": 9097,
+      "passages": 192,
+      "unique_passages": 192,
+      "preview": "# Negation and correction: a wrong value is stated, then corrected.\nthe door is not closed.it is open.the door is open .\nthe permit is not denied.it is approved .\nnora did not buy milk.she bought bread.nora bought bread .\niris did not buy milk.she bought rice.iris bought rice .\niris did not buy milk"
+    },
+    {
+      "file": "spatial_relations.md",
+      "bytes": 6255,
+      "sha256": "d7682ddacccf0c203248dc11a4a534b27a6f960b53988b123d5eaf496584fe4e",
+      "warnings": [],
+      "characters": 6255,
+      "passages": 107,
+      "unique_passages": 107,
+      "preview": "# Spatial relations: containment, above/below, left/right and compass directions.\nthe shop is inside the arcade.the arcade contains the shop .\nthe desk is inside the office .\nthe kitchen is left of the dining.the dining is to the right of the kitchen .\nthe building is north of the park.the park is t"
+    }
+  ],
+  "ignored": [],
+  "external_passages": 434,
+  "mode": "classroom",
+  "base_passages": 6200,
+  "unique_passages": 5026,
+  "new_unique_passages": 434,
+  "duplicates_removed": 1608,
+  "max_passage_tokens": 47,
+  "split_unit": "deduplicated passage, not source file"
+}
