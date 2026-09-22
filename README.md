@@ -231,7 +231,8 @@ change or to the model simply getting better at everything.
 **Two things I did not predict.** `new_wording` improved from 4/8 to 8/8 even though I
 taught it nothing — more varied data appears to have helped the model generalize across
 phrasings of the starter patterns. And `negation` scored zero despite being the category
-I gave the *most* examples (191 of 434 lines).
+I gave the *most* examples (192 of the 434 added passages; each file's `#` heading line
+becomes a passage too, which is why the counts run one above the generated line counts).
 
 ---
 
