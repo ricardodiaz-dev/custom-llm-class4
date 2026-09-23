@@ -1,0 +1,73 @@
+{
+  "files": [
+    {
+      "file": "categories_and_kinds.md",
+      "bytes": 3329,
+      "sha256": "7b7e5510b539ad5ec199f499516ab93752102c61ebe7b2ea82a45b74d541d0cd",
+      "warnings": [],
+      "characters": 3329,
+      "passages": 135,
+      "unique_passages": 135,
+      "preview": "a puppy grows into a dog .\nthe bus is a vehicle .\nthe duplex is a building .\nevery truck is a vehicle .\nthe duck is a bird .\nthe tram is a vehicle .\nevery cat is an animal .\na tram is a vehicle .\na carrot is a vegetable .\na goat is an animal .\nthe cod is a fish .\nthe sheep is an animal .\na horse is "
+    },
+    {
+      "file": "everyday_knowledge.md",
+      "bytes": 1708,
+      "sha256": "3d035f79a414ed34a22b0959f9f56839fc709b40a4696f6920d959a7a7e8610f",
+      "warnings": [],
+      "characters": 1708,
+      "passages": 49,
+      "unique_passages": 49,
+      "preview": "he eats bread when hungry .\nthe tenant is hungry before a meal .\na pillow is soft and a spoon is hard .\na roof keeps a person dry in the rain .\na person uses a canopy to stay dry .\nwater becomes ice in winter .\na person uses a coat to stay dry .\na shoe is not a light .\nsand is dry and wood is dry .\n"
+    },
+    {
+      "file": "grammar_number_and_tense.md",
+      "bytes": 3323,
+      "sha256": "53777ff27551ef6d670887e5ec60766f8cf23b8d613a3b0ca0a367bb44daad6d",
+      "warnings": [],
+      "characters": 3323,
+      "passages": 149,
+      "unique_passages": 149,
+      "preview": "the owner will wait later .\nyesterday the tenant waited .\nnora will park later .\nmaya is waiting now .\nthe duck is here .\nmany dogs are small .\nmany goats are small .\nthe owner is working now .\ntoday maya works .\none lamp is here .\none cat is here .\nthe tree is here .\nthey walk every day .\ntoday the"
+    },
+    {
+      "file": "negation_and_correction.md",
+      "bytes": 32559,
+      "sha256": "2d977bb8136c0206f161711d407c91840c73189d6939e6bfff3ff5a8ba012766",
+      "warnings": [],
+      "characters": 32559,
+      "passages": 649,
+      "unique_passages": 649,
+      "preview": "ava did not buy milk.she bought bread.ava bought bread .\nthe parcel is not developed.it is vacant .\nmaya did not take milk.she took rice.maya took rice .\nthe window is not red.it is yellow.the window is yellow .\npaz did not take tea.she took milk.paz took milk .\npaz did not buy rice.she bought milk."
+    },
+    {
+      "file": "opposites.md",
+      "bytes": 2727,
+      "sha256": "720ee4e93697e7b97a15162ea10d5f30710bf489f35eb7bb7577ad5859ed4e1b",
+      "warnings": [],
+      "characters": 2727,
+      "passages": 81,
+      "unique_passages": 81,
+      "preview": "the opposite of hard is soft .\nclosed and open are opposites .\nthe opposite of slow is fast .\nthe opposite of closed is open .\nthe opposite of wet is dry .\nfaint and loud are opposites .\nslow and fast are opposites .\nthe opposite of old is new .\nwhen a thing is not open it is closed .\nthe opposite o"
+    },
+    {
+      "file": "spatial_relations.md",
+      "bytes": 6173,
+      "sha256": "fd1759c86cb42880f6012abb2ff75d59fbe25e879aab8c300bd7c6392736e913",
+      "warnings": [],
+      "characters": 6173,
+      "passages": 106,
+      "unique_passages": 106,
+      "preview": "the shop is inside the arcade.the arcade contains the shop .\nthe desk is inside the office .\nthe kitchen is left of the dining.the dining is to the right of the kitchen .\nthe building is north of the park.the park is to the south of the building .\nthe alley is south of the lot.the lot is to the nort"
+    }
+  ],
+  "ignored": [],
+  "external_passages": 1169,
+  "mode": "classroom",
+  "base_passages": 6200,
+  "unique_passages": 5761,
+  "new_unique_passages": 1169,
+  "duplicates_removed": 1608,
+  "max_passage_tokens": 47,
+  "split_unit": "deduplicated passage, not source file"
+}

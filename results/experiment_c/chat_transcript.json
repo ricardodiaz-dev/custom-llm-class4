@@ -1,0 +1,33 @@
+{
+  "model_sha256": "f199e83352d21f70d9d723194a34cd5d352b44dc7c3832c687b0e41a5538228c",
+  "completed_steps": 3000,
+  "fresh_context_per_prompt": true,
+  "temperature": 0.8,
+  "max_tokens": 24,
+  "turns": [
+    {
+      "prompt": "the opposite of cold is",
+      "seed": 2026,
+      "response": "nurse .",
+      "unknown_prompt_words": [],
+      "prompt_truncated": false
+    },
+    {
+      "prompt": "the permit is not approved.it is",
+      "seed": 2027,
+      "response": "denied . the permit is filed .",
+      "unknown_prompt_words": [],
+      "prompt_truncated": false
+    },
+    {
+      "prompt": "the design review board approved the variance",
+      "seed": 2028,
+      "response": "the price .",
+      "unknown_prompt_words": [
+        "board",
+        "variance"
+      ],
+      "prompt_truncated": false
+    }
+  ]
+}

@@ -122,17 +122,19 @@ def spatial_lines():
     return lines
 
 
+def article(word):
+    """'a' or 'an' -- the generated corpus is the model's only grammar lesson."""
+    return "an" if word[0] in "aeiou" else "a"
+
+
 def category_lines():
     lines = []
-    for thing, kind in KINDS:
-        lines.append(f"a {thing} is a {kind} .")
-        lines.append(f"the {thing} is a {kind} .")
-        lines.append(f"every {thing} is a {kind} .")
-    for thing, kind in KINDS_AN:
-        lines.append(f"an {thing} is a {kind} .")
-        lines.append(f"the {thing} is a {kind} .")
+    for thing, kind in KINDS + KINDS_AN:
+        lines.append(f"{article(thing)} {thing} is {article(kind)} {kind} .")
+        lines.append(f"the {thing} is {article(kind)} {kind} .")
+        lines.append(f"every {thing} is {article(kind)} {kind} .")
     for young, grown in GROWS:
-        lines.append(f"a {young} grows into a {grown} .")
+        lines.append(f"{article(young)} {young} grows into {article(grown)} {grown} .")
         lines.append(f"the {young} grows into the {grown} .")
     for material, kind in MATERIALS:
         lines.append(f"{material} is a {kind} .")
@@ -155,7 +157,7 @@ def write(name, lines, suite, header):
     rng = random.Random(SEED)
     for attempt in range(200):
         rng.shuffle(lines)
-        text = header + "\n" + "\n".join(lines) + "\n"
+        text = (header + "\n" if header else "") + "\n".join(lines) + "\n"
         hits = matching_cases(text, suite)
         if not hits:
             (OUT / name).write_text(text, encoding="utf-8")

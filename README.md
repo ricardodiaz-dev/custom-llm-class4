@@ -1,153 +1,175 @@
-# Building a Custom LLM — a controlled corpus experiment
+# Building a Custom LLM — what actually makes a tiny model learn
 
 **Ricardo Díaz Ortiz · Class 4, From Zero to AI Agents, Fall 26**
 
-Two training runs of Karpathy's nanoGPT (2 blocks, 4 heads, 64-number embeddings,
-48-token context, whole-word tokens). The **only** difference between them is the
-training data. Settings, seed, split method, evaluation panels and generation settings
-are identical, so anything that moves can be attributed to the corpus.
+Three training runs of Karpathy's nanoGPT (2 blocks, 4 heads, 64-number embeddings,
+48-token context, whole-word tokens). Steps, learning rate, seed, split method, evaluation
+panels and generation settings are identical in all three. **The corpus is the only
+variable**, so anything that moves is attributable to the data.
 
-| | A — starter | B — corpus extension |
-|---|---|---|
-| Notebook | [`custom_llm_starter.ipynb`](custom_llm_starter.ipynb) | [`custom_llm_extension.ipynb`](custom_llm_extension.ipynb) |
-| Corpus | classroom sentences only | classroom + my teaching material |
-| Evidence | [`results/starter/`](results/starter) | [`results/extension/`](results/extension) |
+| | A — starter | B — extension | C — hypothesis test |
+|---|---|---|---|
+| Notebook | [`custom_llm_starter.ipynb`](custom_llm_starter.ipynb) | [`custom_llm_extension.ipynb`](custom_llm_extension.ipynb) | [`custom_llm_experiment_c.ipynb`](custom_llm_experiment_c.ipynb) |
+| Corpus | classroom only | + 434 passages, 3 categories | + 1,169 passages, 6 categories |
+| Evidence | [`results/starter/`](results/starter) | [`results/extension/`](results/extension) | [`results/experiment_c/`](results/experiment_c) |
+| **All-case score** | **20/48** | **28/48** | **34/48** |
 
-**Headline result:** adding 434 passages of teaching material moved the all-case score
-from **20/48 to 28/48**, and every point of that gain came from the three categories I
-deliberately taught. The five categories I deliberately left alone did not move at all.
-One of the three taught categories still scored **zero**, and the reason turned out to be
-a flaw in how I built the data — that is the most useful thing I learned here.
+Experiments A and B are the two the assignment requires. C is an optional third run that
+exists to test a claim B produced — and it **refuted** that claim, which turned out to be
+the most useful result of the three.
+
+**The finding.** Whether this model learns a pattern tracks the **density of that pattern
+in the training corpus** far more than the conceptual difficulty of the task. I predicted
+the opposite and was wrong, with measurements to show it.
+
+| Pattern | B density | B result | C density | C result |
+|---|---:|---|---:|---|
+| negation, 3-clause | 1.97% | **0/3** | **9.17%** | **2/3** |
+| `X is inside Y . Y contains the ___` | 0.45% | correct | 0.41% | correct |
+| `above` / `below` | 0.35% | correct | 0.30% | correct |
+| `left` / `right` | 0.27% | correct | 0.24% | **lost it** (0.410 vs 0.405) |
+| `a X is a Y` | 1.72% | 1/3 | 1.32% | **0/3** |
+| `the opposite of X is ___` | — | — | 0.37% | 1/3 |
+
+Patterns whose density rose improved; patterns whose density fell degraded, even though
+their absolute passage counts never changed. Breadth cost depth.
 
 ---
 
-## 1. My three choices and why
+## 1. My three choices
 
-**Corpus.** Experiment A uses the supplied classroom sentences with an empty `corpus/`.
-Experiment B adds three generated files targeting three of the eight eval extension
-categories. I picked the three by first measuring what the starter corpus could even be
-scored on, rather than guessing:
+**Training steps: 3,000** and **learning rate: 0.001** in every run — the assignment's
+suggested values, held fixed precisely so the corpus stays the only variable. One step
+updates weights from 32 passages, so 3,000 steps is roughly twenty exposures per document.
+Too large a learning rate overshoots and the loss oscillates; too small and 3,000 steps
+end far short. The notebook's warmup means the first updates are much smaller than 0.001 —
+the saved first update below uses `1e-05`.
 
-| Category | Taught in B? | Why |
-|---|---|---|
-| `negation` | **yes** | Correction patterns are everywhere in entitlement review — a plan *is not* compliant, it *is* conditioned. |
-| `spatial_relations` | **yes** | Setbacks, frontage, adjacency and containment are the substance of zoning. |
-| `categories_and_analogies` | **yes** | Use classification — a duplex *is a* building — is how a planning code decides what rules apply. |
-| `grammar`, `opposites`, `reference`, `sequence`, `everyday_knowledge` | **no — control group** | Left untaught on purpose, so that if they move I know my attribution is wrong. |
+**Corpus** is the choice that varies:
 
-The examples are written in land-use language where the pattern allows it (parcels,
-permits, districts, setbacks), paired with everyday instantiations because the fixed eval
-vocabulary needs covering — a case is unscorable if *any* prompt word or *any* of the
-four choices is unknown.
+| Run | Corpus | Categories taught | Left untaught as control |
+|---|---|---|---|
+| A | classroom sentences only | none | all 8 |
+| B | + `negation`, `spatial_relations`, `categories_and_analogies` | 3 | 5 |
+| C | + `opposites`, `grammar`, `everyday_knowledge`; negation decorrelated and 4× larger | 6 | 2 (`reference`, `sequence`) |
 
-**Training steps: 3,000.** The assignment's suggested budget. One step updates weights
-from 32 passages, so 3,000 steps is ~96,000 passage samples over ~4,900 documents, about
-twenty exposures each. It was also enough that training loss had clearly flattened.
-
-**Learning rate: 0.001**, with the notebook's warmup and cosine decay. Too large an
-update overshoots the minimum and the loss oscillates or diverges; too small and 3,000
-steps end far short of anything useful. 0.001 is the standard AdamW starting point at
-this size, and the warmup means the very first updates are much smaller — the first saved
-update below uses a learning rate of `1e-05`, not `0.001`.
+I chose B's three categories by first **measuring** what the starter corpus could be scored
+on at all — 24 of 48 — rather than guessing. All 24 extension cases failed as
+`out_of_vocabulary`: a vocabulary problem, not a reasoning one.
 
 ### Corpus sources and permissions
 
-All teaching material is **generated by [`build_extension_corpus.py`](build_extension_corpus.py)** —
-nothing is copied from a third party, so there is no licensing question about publishing
-the extracted text, the manifest or the weights. Regenerate it with:
+Every added passage is **generated** by
+[`build_extension_corpus.py`](build_extension_corpus.py) (run B) and
+[`build_experiment_c_corpus.py`](build_experiment_c_corpus.py) (run C). Nothing is copied
+from a third party, so there is no licensing question about publishing the extracted text,
+manifests or weights.
 
 ```bash
-python build_extension_corpus.py
+python build_extension_corpus.py      # reproduces run B's corpus
+python build_experiment_c_corpus.py   # reproduces run C's corpus
 ```
 
-`corpus/` is Git-ignored, so the files themselves are not committed, but the full
-extracted text **is** in [`results/extension/corpus.txt`](results/extension/corpus.txt)
-and the per-file manifest is in
-[`results/extension/corpus_manifest.json`](results/extension/corpus_manifest.json).
+`corpus/` is Git-ignored, but the complete extracted text ships in each run's `corpus.txt`
+([A](results/starter/corpus.txt) · [B](results/extension/corpus.txt) ·
+[C](results/experiment_c/corpus.txt)) with per-file manifests
+([B](results/extension/corpus_manifest.json) · [C](results/experiment_c/corpus_manifest.json)).
 
-I did not use PDFs. My original plan was a folder-only corpus of California land-use
-documents — the Oakland Planning Code, OPR's General Plan Guidelines, design guidelines
-and an adopted development agreement. I dropped it once I measured the evals: a corpus of
-zoning PDFs would make nearly all 48 cases `out_of_vocabulary`, and the assignment asks
-the extension run to teach specific eval categories, which a planning code does not do.
-The land-use framing survives in the *wording* of the teaching material instead. That
-plan is preserved as the proposed next experiment in section 8.
+I used no PDFs. My original plan was a folder-only corpus of California land-use documents —
+the Oakland Planning Code, OPR's General Plan Guidelines, design guidelines, an adopted
+development agreement. I dropped it after measuring the evals: a corpus of zoning PDFs
+would make nearly every case `out_of_vocabulary`, and the extension run is supposed to
+teach specific eval categories, which a planning code does not. The land-use framing
+survives in the *wording* of the teaching material — parcels, permits, districts,
+setbacks — and the original plan is the proposed next experiment in section 10.
 
 ### Eval separation
 
-| Check | Result |
-|---|---|
-| Reserved classroom passages withheld before the split | **160**, covering 16 cases (`lang_01`–`lang_16`) |
-| Lines dropped for reproducing a test item | **1** — it reproduced `lang_32` exactly |
-| Suite SHA-256 | `1d7c503f…c1c9e1d`, identical in both runs |
+| Check | A | B | C |
+|---|---|---|---|
+| Exact eval prompts found in training text | **0** | **0** | **0** |
+| Eval explanation text found in training text | none | none | none |
+| Classroom passages withheld before the split | 160 | 160 | 160 |
+| Generated lines refused for reproducing a test item | — | 1 | 4 |
+| `CORPUS_FOLDER` | `corpus/` | `corpus/` | `corpus/` |
 
-Full record: [starter](results/starter/eval_separation.json) ·
-[extension](results/extension/eval_separation.json).
+The suite lives in `evals/`, never in `corpus/`, and its SHA-256 (`1d7c503f…c1c9e1d`) is
+identical across all three runs. The generators refuse to emit any line that reproduces a
+test item — B dropped one (it reproduced `lang_32` verbatim), C dropped four, including all
+three negation test items, which decorrelation naturally produces. Both generators then
+re-shuffle until the **whole assembled file** is clean, because `reject_eval_leakage`
+matches against whole-file text and two individually safe lines can spell out a prompt when
+adjacent.
 
-The generator drops any line that reproduces a test item, then re-shuffles until the
-whole assembled file is clean too, because `reject_eval_leakage` matches against
-whole-file text and two individually safe lines can spell out a prompt when adjacent.
+Separation records: [A](results/starter/eval_separation.json) ·
+[B](results/extension/eval_separation.json) · [C](results/experiment_c/eval_separation.json).
 
-This is a normalized contiguous-prompt check, not a semantic one. These public tests
-guided what I chose to teach, which makes this a **development benchmark**. A claim about
-generalizing to unseen material would need tests that never influenced the corpus.
+This is a normalized contiguous-prompt check, not a semantic one. **These public tests
+guided what I chose to teach, and run C was designed after inspecting run B's results.**
+That makes this a development benchmark. A claim about generalizing to unseen material
+would need tests that never influenced the corpus.
 
 ---
 
 ## 2. What I predicted, and what actually happened
 
-Predictions were written before each run: [starter](docs_prediction_starter.md),
-[extension](docs_prediction_extension.md). Both are also the prediction cell in the
-executed notebooks.
+Predictions were written before each run: [A](docs_prediction_starter.md) ·
+[B](docs_prediction_extension.md) · [C](docs_prediction_c.md), and each is the prediction
+cell in its executed notebook.
 
 | I predicted | What happened | |
 |---|---|---|
 | Exactly 24/48 scorable with the starter corpus | 24/48 | ✅ |
 | Scorable rises to 33 in B | 33/48 | ✅ |
-| Control categories stay at 0 scorable | all five stayed at 0 | ✅ |
-| B's losses **higher** than A's, not lower | 0.778 vs 0.678 train; 0.882 vs 0.706 validation | ✅ |
-| `customer`'s neighbours become the nouns sharing its contexts | subscriber, buyer, shopper, consumer, client — all ≥ 0.969 | ✅ |
-| Vocabulary about 281 types in B | **317** types | ❌ I quoted a figure from an earlier, smaller draft of the generator and forgot to update it after widening the pair lists |
-| Pattern categories (negation, spatial) beat the knowledge category | **wrong** — spatial 3/3, categories 1/3, **negation 0/3** | ❌ |
+| B's five control categories stay at 0 scorable | all five did | ✅ |
+| B's losses **higher** than A's, not lower | 0.778 vs 0.678 train | ✅ |
+| `customer`'s neighbours become the nouns sharing its contexts | all five, ≥ 0.969 | ✅ |
+| B's vocabulary about 281 types | **317** — I quoted a figure from an earlier draft of the generator | ❌ |
+| B: pattern categories beat the knowledge category | spatial 3/3, categories 1/3, **negation 0/3** | ❌ |
+| C: scorable rises to 42 | 42/48 | ✅ |
+| C: `grammar` and `everyday_knowledge` score well | 3/3 and 3/3 | ✅ |
+| C: `lang_46` still fails | it did, `bird` 0.119 vs `fish` 0.009 | ✅ |
+| **C: negation still fails at 0–1 of 3** | **2 of 3** | ❌ **hypothesis refuted** |
+| C: `opposites` scores well — it is an "easy" associative task | **1 of 3** | ❌ |
 
-That last miss is the interesting one and section 6 works out why.
+The last two are the point of the whole project, and section 6 works through them.
 
 ---
 
 ## 3. Run facts
 
-| | A — starter | B — extension |
-|---|---|---|
-| Corpus mode | classroom | classroom + 3 files |
-| Unique passages | 4,592 | 5,026 (**+434 new**) |
-| Duplicate passages removed | — | 1,608 of 6,200 |
-| Train / validation | 4,132 / 460 | 4,523 / 503 |
-| Reserved eval passages | 160 | 160 |
-| Distinct training types | 133 | 317 |
-| Vocabulary size | 136 | 320 |
-| Training UNK rate | 0.00% | 0.00% |
-| Held-out UNK rate | 0.00% | 0.07% |
-| Parameters | 111,872 | 123,648 |
-| Steps completed | 3,000 of 3,000 | 3,000 of 3,000 |
-| Interrupted | no | no |
-| Training time | 15.5 s | 16.6 s |
-| Device / hardware | cpu · macOS-15.6.1-arm64 | cpu · macOS-15.6.1-arm64 |
+| | A — starter | B — extension | C — hypothesis test |
+|---|---|---|---|
+| Corpus files | 0 | 3 | 6 |
+| Unique passages | 4,592 | 5,026 | 5,761 |
+| New passages added | — | 434 | 1,169 |
+| Duplicates removed | 1,608 | 1,608 | 1,608 |
+| Train / validation | 4,132 / 460 | 4,523 / 503 | 5,184 / 577 |
+| Reserved eval passages | 160 | 160 | 160 |
+| Distinct training types | 133 | 317 | 404 |
+| Vocabulary size | 136 | 320 | 407 |
+| Training UNK rate | 0.00% | 0.00% | 0.00% |
+| Held-out UNK rate | 0.00% | 0.07% | 0.05% |
+| Parameters | 111,872 | 123,648 | 129,216 |
+| Steps completed | 3,000 / 3,000 | 3,000 / 3,000 | 3,000 / 3,000 |
+| Interrupted | no | no | no |
+| Training time | 15.5 s | 16.6 s | 17.3 s |
+| Device / hardware | cpu · macOS-15.6.1-arm64 | cpu · macOS-15.6.1-arm64 | cpu · macOS-15.6.1-arm64 |
 
-Neither run was interrupted and neither errored. Python 3.12.14, PyTorch 2.14.0, Apple
-Silicon CPU. Config: [starter](results/starter/config.json) ·
-[extension](results/extension/config.json). Vocabulary reports:
-[starter](results/starter/vocabulary_report.json) ·
-[extension](results/extension/vocabulary_report.json).
+No run was interrupted and none errored. Python 3.12.14, PyTorch 2.14.0, Apple Silicon CPU.
+Configs: [A](results/starter/config.json) · [B](results/extension/config.json) ·
+[C](results/experiment_c/config.json). Vocabulary reports:
+[A](results/starter/vocabulary_report.json) · [B](results/extension/vocabulary_report.json) ·
+[C](results/experiment_c/vocabulary_report.json).
 
-**The 509-type cap never binds.** The starter corpus has only 133 distinct types and the
-extension 317, both far below 509. So nothing was pushed out of the vocabulary by my
-additions — a point I had wrongly worried about while planning. The held-out UNK rate
-rises only from 0.00% to 0.07%.
+**The 509-type cap never binds.** 133, 317 and 404 distinct types — all below 509, so
+nothing was pushed out of the vocabulary by my additions. I had wrongly worried about this
+while planning. The held-out UNK rate never exceeds 0.07%.
 
 The 90/10 split is by **deduplicated passage, not by source file**, so passages from the
-same file sit on both sides. This does not test generalization to unseen documents. The
-exact document lists are in [starter `split.json`](results/starter/split.json) and
-[extension `split.json`](results/extension/split.json).
+same file sit on both sides. This does not test generalization to unseen documents. Exact
+document lists: [A](results/starter/split.json) · [B](results/extension/split.json) ·
+[C](results/experiment_c/split.json).
 
 ---
 
@@ -155,180 +177,222 @@ exact document lists are in [starter `split.json`](results/starter/split.json) a
 
 ![Training curves — starter](results/starter/training_curves.svg)
 ![Training curves — extension](results/extension/training_curves.svg)
+![Training curves — experiment C](results/experiment_c/training_curves.svg)
 
 These are **fixed evaluation panels of at most 20 training and 20 validation documents**,
 averaging non-padding next-token targets — small estimates, not full-corpus measurements.
-Both runs use the same panel sizes (`{"train": 20, "validation": 20}`). Every measured
-value, complete:
+All three runs use the same panel sizes. Every measured value:
 
-| Step | A train | A validation | B train | B validation |
-|---:|---:|---:|---:|---:|
-| 0 | 4.9263 | 4.9275 | 5.7798 | 5.7739 |
-| 1500 | 0.6821 | 0.7182 | 0.7992 | 0.9104 |
-| 3000 | 0.6783 | 0.7061 | 0.7780 | 0.8817 |
+| Step | A train | A val | B train | B val | C train | C val |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 4.9263 | 4.9275 | 5.7798 | 5.7739 | 6.0144 | 6.0213 |
+| 1500 | 0.6821 | 0.7182 | 0.7992 | 0.9104 | 0.7475 | 0.8970 |
+| 3000 | 0.6783 | 0.7061 | 0.7780 | 0.8817 | 0.7351 | 0.8597 |
 
-Full history: [starter](results/starter/history.json) ·
-[extension](results/extension/history.json). Per-step CSV:
-[starter](results/starter/training.csv) · [extension](results/extension/training.csv).
-Summaries: [starter](results/starter/training_summary.json) ·
-[extension](results/extension/training_summary.json).
+History: [A](results/starter/history.json) · [B](results/extension/history.json) ·
+[C](results/experiment_c/history.json). Per-step CSV:
+[A](results/starter/training.csv) · [B](results/extension/training.csv) ·
+[C](results/experiment_c/training.csv). Summaries:
+[A](results/starter/training_summary.json) · [B](results/extension/training_summary.json) ·
+[C](results/experiment_c/training_summary.json).
 
-Step 0 differs between runs (4.93 vs 5.78) because loss at random initialization is
-roughly the natural log of the vocabulary size: ln(136) = 4.91 and ln(320) = 5.77. That
-match is a good sanity check that the untrained model really is guessing uniformly.
+Step 0 differs between runs because loss at random initialization is about the natural log
+of the vocabulary size: ln(136) = 4.91, ln(320) = 5.77, ln(407) = 6.01. The match confirms
+the untrained model really is guessing uniformly.
 
-**B's losses are higher than A's, and that does not mean B is worse.** The two models
-predict over different vocabularies, so the numbers are not comparable as a ranking.
-B scores better on the evals while carrying the higher loss.
+**Higher loss does not mean a worse model here.** The three models predict over different
+vocabularies, so the numbers are not comparable as a ranking. C carries a higher loss than
+A and scores 14 more eval points.
 
-Validation stays close to training in both runs (gap 0.028 in A, 0.104 in B). That
-closeness measures template memorization, not generalization — the held-out passages come
-from the same generator and the same frames. The gap being ~4× wider in B is consistent
-with B's corpus being genuinely more varied.
+The validation gap widens as the corpus diversifies — 0.028 in A, 0.104 in B, 0.125 in C —
+which is consistent with the later corpora being genuinely more varied rather than more
+memorizable.
 
 ---
 
-## 5. Evals — all four result sets
+## 5. Evals — all six result sets
 
-48 fixed cases, unchanged across both experiments, scored by whether the model gives the
-highest probability to the correct word among four single-word choices. Ties score zero.
-Unknown-word cases are `out_of_vocabulary` and count as zero in all-case success.
+48 fixed cases, unchanged across all three experiments, scored by whether the model gives
+the correct choice the highest probability among four. Ties score zero. Unknown-word cases
+are `out_of_vocabulary` and count as zero in all-case success.
 
-| Experiment | Stage | Correct /48 | All-case success | Scorable | Accuracy on scorable | Coverage |
+| Experiment | Stage | Correct /48 | All-case | Scorable | Accuracy on scorable | Coverage |
 |---|---|---:|---:|---:|---:|---:|
 | A — starter | untrained | 9 | 18.8% | 24 | 37.5% | 50% |
 | A — starter | final | 20 | 41.7% | 24 | 83.3% | 50% |
 | B — extension | untrained | 7 | 14.6% | 33 | 21.2% | 69% |
-| B — extension | final | **28** | **58.3%** | 33 | 84.8% | 69% |
+| B — extension | final | 28 | 58.3% | 33 | 84.8% | 69% |
+| C — hypothesis | untrained | 10 | 20.8% | 42 | 23.8% | 88% |
+| C — hypothesis | final | **34** | **70.8%** | 42 | 81.0% | 88% |
 
 Result sets: [A untrained](results/starter/language_evals/untrained) ·
 [A final](results/starter/language_evals/final) ·
 [B untrained](results/extension/language_evals/untrained) ·
-[B final](results/extension/language_evals/final). Comparisons:
-[starter](results/starter/language_eval_comparison.json) ·
-[extension](results/extension/language_eval_comparison.json).
+[B final](results/extension/language_evals/final) ·
+[C untrained](results/experiment_c/language_evals/untrained) ·
+[C final](results/experiment_c/language_evals/final). Comparisons:
+[A](results/starter/language_eval_comparison.json) ·
+[B](results/extension/language_eval_comparison.json) ·
+[C](results/experiment_c/language_eval_comparison.json).
 
-### Taught vs. control, trained models
+### By category — trained models. Figures are `correct/total (scorable)`
 
-| Category | Taught? | A correct | A scorable | B correct | B scorable |
-|---|---|---:|---:|---:|---:|
-| `negation` | **yes** | 0/3 | 0 | **0/3** | 3 |
-| `spatial_relations` | **yes** | 0/3 | 0 | **3/3** | 3 |
-| `categories_and_analogies` | **yes** | 0/3 | 0 | **1/3** | 3 |
-| `grammar` | control | 0/3 | 0 | 0/3 | 0 |
-| `opposites` | control | 0/3 | 0 | 0/3 | 0 |
-| `reference` | control | 0/3 | 0 | 0/3 | 0 |
-| `sequence` | control | 0/3 | 0 | 0/3 | 0 |
-| `everyday_knowledge` | control | 0/3 | 0 | 0/3 | 0 |
-| `domain_context` | control | 8/8 | 8 | 8/8 | 8 |
-| `domain_place` | control | 8/8 | 8 | 8/8 | 8 |
-| `new_wording` | control | 4/8 | 8 | **8/8** | 8 |
+| Category | Taught in | A | B | C |
+|---|---|---|---|---|
+| `negation` | B, C | 0/3 (0) | 0/3 (3) | **2/3 (3)** |
+| `spatial_relations` | B, C | 0/3 (0) | **3/3 (3)** | 2/3 (3) |
+| `categories_and_analogies` | B, C | 0/3 (0) | 1/3 (3) | 0/3 (3) |
+| `opposites` | C | 0/3 (0) | 0/3 (0) | 1/3 (3) |
+| `grammar` | C | 0/3 (0) | 0/3 (0) | **3/3 (3)** |
+| `everyday_knowledge` | C | 0/3 (0) | 0/3 (0) | **3/3 (3)** |
+| `reference` | never | 0/3 (0) | 0/3 (0) | 0/3 (0) |
+| `sequence` | never | 0/3 (0) | 0/3 (0) | 0/3 (0) |
+| `domain_context` | never | 8/8 (8) | 8/8 (8) | 8/8 (8) |
+| `domain_place` | never | 8/8 (8) | 8/8 (8) | 8/8 (8) |
+| `new_wording` | never | 4/8 (8) | 8/8 (8) | 7/8 (8) |
 
-The control group did what a control group should: five untaught categories stayed at
-zero scorable cases. The gain is attributable to the data I added, not to a settings
-change or to the model simply getting better at everything.
+`reference` and `sequence` were never taught in any run and never moved off zero scorable
+cases, in any run. That is the control working: gains came from data I added, not from the
+model getting generally better.
 
-**Two things I did not predict.** `new_wording` improved from 4/8 to 8/8 even though I
-taught it nothing — more varied data appears to have helped the model generalize across
-phrasings of the starter patterns. And `negation` scored zero despite being the category
-I gave the *most* examples (192 of the 434 added passages; each file's `#` heading line
-becomes a passage too, which is why the counts run one above the generated line counts).
+Two things I did not engineer. `new_wording` improved from 4/8 to 8/8 in B despite being
+untaught — more varied data made the model less brittle across phrasings, the closest thing
+here to genuine generalization — and then slipped back to 7/8 in C. And the first 16 cases
+score 16/16 in every run, but those prompts are the training frames with the last word
+removed, so that is frame-learning, not comprehension.
 
 ---
 
-## 6. Why negation failed — the most useful thing in this experiment
+## 6. The claim I made, and the experiment that refuted it
 
-Nothing here is a vocabulary problem: all three negation cases are `scored`, not
-`out_of_vocabulary`. The model had the words and still got them wrong.
+### What run B looked like
 
-| Case | Prompt | Expected | Predicted | Probabilities |
-|---|---|---|---|---|
-| `lang_31` | `the box is not red . it is blue . the box is` | blue | **green** | green .414, yellow .238, red .177, **blue .062** |
-| `lang_32` | `ava did not buy tea . she bought milk . ava bought` | milk | **rice** | rice .278, bread .263, tea .233, **milk .220** |
-| `lang_33` | `the door is not open . it is closed . the door is` | closed | **open** | open .410, **closed .351**, wide .001, missing .000 |
-
-Look at `lang_31`. Blue is the model's *least* likely colour at 0.062. In my teaching data
-I paired each subject with a fixed handful of values — `box` appeared with blue→red,
-green→yellow and yellow→green, so the string "the box is" was followed by red, yellow or
-green in training and **never once by blue**. The model minimized loss by memorizing a
-per-subject prior over values instead of learning the rule "copy whatever follows *it
-is*". `lang_33` shows the same thing more mildly: I taught `door`→open but used `gate`
-for the closed direction, and the model duly prefers open. `lang_32` is near-uniform
-(0.22–0.28), which is the model admitting it has no pattern at all.
-
-Spatial relations avoided this trap by construction. The answer is fixed by the relation
-rather than by the subject — if `X is above Y` then `Y is below X` no matter what X and Y
-are — so a subject-prior shortcut earns nothing and copying from context is the only way
-to reduce loss. Hence 3/3.
-
-The embeddings confirm the mechanism. Cosine neighbours in the full 64-dimension space
-(computed by [`neighbors.py`](neighbors.py)):
+B taught three categories. Spatial relations went 3/3, categories 1/3, and **negation 0/3
+despite receiving the most examples**. Probing B's trained model produced a striking result:
 
 ```
-`above`  before: pea (0.358), site (0.321), is (0.304), update (0.286)
-         after : below (0.916), beside (0.674), inside (0.592), left (0.584), right (0.527)
+nora did not buy tea . she bought milk . nora bought  ->  rice .277 bread .264 tea .232 milk .219
+iris did not buy tea . she bought milk . iris bought  ->  rice .278 bread .264 tea .232 milk .219
+june did not buy tea . she bought milk . june bought  ->  rice .277 bread .265 tea .232 milk .219
+nora did not buy milk . she bought bread . nora bought -> rice .278 bread .264 tea .232 milk .219
+```
 
+Identical to three decimals regardless of the buyer *or the goods named in the prompt*. In
+that frame the model was not reading the context at all — it had learned one static ranking
+of groceries and recited it.
+
+### The claim
+
+I formed a hypothesis: the model learns patterns whose answer is fixed by **position or
+association**, and fails at patterns requiring it to **discriminate** which of two
+same-category words in context was the corrected one. Supporting evidence looked strong —
+`contains` was learned from only 30 passages while the buy frame failed with 59.
+
+I predicted negation would stay at 0–1 of 3 in run C even with decorrelated, four-times-
+larger data, and that the "easy" associative categories would score well.
+
+### What run C actually showed
+
+**Negation went to 2/3.** The task was learnable all along.
+
+| Case | B | C |
+|---|---|---|
+| `the box is not red . it is blue . the box is ___` | green .414, **blue .062** → wrong | **blue .325**, yellow .276 → **correct** |
+| `the door is not open . it is closed . the door is ___` | open .410, closed .351 → wrong | **closed .864** → **correct** |
+| `ava did not buy tea . she bought milk . ava bought ___` | flat, milk .219 → wrong | still flat, milk .233 → wrong |
+
+And `opposites`, which I called easy, scored **1/3**.
+
+### The explanation that survives
+
+Line up every pattern against how dense it is in its corpus and the picture is consistent:
+
+| Pattern | B density | B | C density | C |
+|---|---:|---|---:|---|
+| negation, 3-clause | 1.97% | 0/3 | **9.17%** | **2/3** |
+| `a X is a Y` | 1.72% | 1/3 | 1.32% | 0/3 |
+| `contains` | 0.45% | correct | 0.41% | correct |
+| `above`/`below` | 0.35% | correct | 0.30% | correct |
+| `left`/`right` | 0.27% | correct | 0.24% | lost, 0.410 vs 0.405 |
+| `the opposite of X is` | — | — | 0.37% | 1/3 |
+
+Negation's density rose 4.7× and it went from total failure to 2/3. Every carried-over
+pattern whose share of the corpus *fell* — because C's corpus is larger — got worse, even
+though their absolute passage counts never changed. `opposites` failed not because it is
+hard but because at 0.37% it is one of the thinnest patterns in the corpus.
+
+**So the operative variable is pattern density, not task difficulty.** My "discrimination"
+story was a plausible narrative fitted to one run; a second run with a written-down
+prediction broke it.
+
+Two residues the density story does not fully explain, which I am flagging rather than
+explaining away:
+
+1. **The buy frame is still flat in C**, even at high density. Its value set has four
+   members and both candidates are groceries; the colour set that succeeded had four
+   members too, but `lang_33`'s set has only **two** (`open`/`closed`) and it scored 0.864 —
+   by far the most confident correct answer in the suite. Narrower choice sets appear to be
+   learned much more strongly, which is a hypothesis for a fourth run, not a finding.
+2. **`categories_and_analogies` got worse, not just weaker.** The embeddings say why:
+
+```
 `bird`   before: banana (0.361), purchase (0.259), corrected (0.238)
          after : tool (0.740), building (0.708), vehicle (0.668), sheep (0.658), tree (0.653)
 ```
 
-`above` landed next to the other spatial words — a usable relation. But `bird` landed next
-to `tool`, `building` and `vehicle`: the model learned a generic "category slot" rather
-than the link from `salmon` to `fish`. That is exactly why `lang_46` answers
-`a salmon is a` with **bird at 0.642 and fish at 0.0007** — it picks the most frequent
-filler for the slot. My `KINDS` list had five birds in it and it simply learned that birds
-are common.
-
-I cross-checked these against `embedding-viewer.html` by loading
-[`results/extension/checkpoint.json`](results/extension/checkpoint.json) into it. The viewer
-reports the same figures for `above` — below 0.916, beside 0.674, inside 0.592 — and a total
-movement of 0.818 in 64 dimensions. The viewer's map is a PCA projection down to three
-dimensions; the cosine neighbours above use the full vector space, which is why the picture
-and the numbers can disagree.
+`bird` sits next to `tool`, `building` and `vehicle` — the model learned a generic
+"category slot" rather than the link from `salmon` to `fish`, so it fills the slot with
+whichever class word is most frequent. My `KINDS` list contains five birds. Computed by
+[`neighbors.py`](neighbors.py); cross-checked in `embedding-viewer.html`, which reports the
+same figures for `above` (below 0.916, beside 0.674, inside 0.592) and a total movement of
+0.818 in 64 dimensions. The viewer's map is a 3-dimension PCA projection; these neighbours
+use the full vector space, which is why the picture and the numbers can disagree.
 
 ---
 
-## 7. How this actually works, in the numbers from these runs
+## 7. How this works, in the numbers from these runs
 
 *(Section to rewrite in my own words before submitting.)*
 
-**Corpus → passages.** A corpus is the collection of training examples. Long text is split
-into non-overlapping passages of at most 47 tokens at sentence boundaries, deduplicated,
-then split 90/10. B started from 6,200 chunks, 1,608 of which were duplicates, leaving
-5,026 unique passages.
+Source files: `tokenization.json`
+([A](results/starter/tokenization.json) · [B](results/extension/tokenization.json) ·
+[C](results/experiment_c/tokenization.json)) and `inspection.json`
+([A](results/starter/inspection.json) · [B](results/extension/inspection.json) ·
+[C](results/experiment_c/inspection.json)).
 
-Source files for everything in this section: `tokenization.json`
-([starter](results/starter/tokenization.json) · [extension](results/extension/tokenization.json))
-and `inspection.json`
-([starter](results/starter/inspection.json) · [extension](results/extension/inspection.json)).
+**Corpus → passages.** A corpus is the complete and only set of text the model reads; it
+starts as random numbers with no pretrained knowledge. Long text is split into
+non-overlapping passages of at most 47 tokens at sentence boundaries, deduplicated, then
+split 90/10. C started from 7,369 chunks, 1,608 of them duplicates, leaving 5,761 unique.
 
-**Tokens and IDs.** A token here is one word or one punctuation mark. An ID is just the
-row number that token was assigned — an arbitrary label, not a quantity. In Experiment A
-the word `customer` has ID **28**; in Experiment B the same word has ID **85**, because
-the vocabulary is rebuilt from that run's training text and sorted differently. Nothing
-about the word changed; only the row number did. IDs are built **only from training text**,
-which is why held-out words can become `<UNK>`.
+**Tokens and IDs.** A token is one word or one punctuation mark. An ID is the row number
+that token was assigned — an arbitrary label, not a quantity. `customer` has ID **28** in
+run A and ID **85** in run B, because the vocabulary is rebuilt from each run's training
+text and sorted differently. Nothing about the word changed; only its row number did. IDs
+come **only from training text**, which is why a word appearing solely in the held-out 10%
+becomes `<UNK>` — that actually bit me in C: `hungry` and `walking` each appeared in only
+one or two passages, both landed in validation, and both vanished from the vocabulary until
+I repeated them across more sentences.
 
 **Vectors and embeddings.** Each row of the embedding table is 64 numbers. That row is the
-embedding. Before training, `customer`'s row starts as small random values:
+embedding. For `customer` in run A:
 
 ```
 before: [-0.0576, -0.0048,  0.0426,  0.0193,  0.0156, -0.0288,  0.0256,  0.0001, …]
 after : [ 0.0366, -0.0182,  0.1330,  0.1060,  0.0630,  0.0189,  0.1523,  0.0929, …]
 ```
 
-The largest single coordinate moved by 0.1616. What makes that meaningful is not the
-individual numbers but where the row ends up relative to others — after training
-`customer` sits at cosine 0.980 from `subscriber`, 0.978 from `buyer`, 0.972 from
-`shopper` and `consumer`, and 0.969 from `client`. Before training its nearest neighbour
-was `bus` at 0.213, which is noise. The model was never told these words are related; it
-put them together because they appear in the same contexts.
+The largest single coordinate moved 0.1616. What makes that meaningful is not the numbers
+but where the row lands relative to others: after training `customer` sits at cosine 0.980
+from `subscriber`, 0.978 from `buyer`, 0.972 from `shopper` and `consumer`, 0.969 from
+`client`. Before training its nearest neighbour was `bus` at 0.213 — noise. Nobody told the
+model these words are related; it placed them together because they share contexts.
 
 **Loss.** Loss measures how surprised the model is by the actual next token. At step 0 it
-is ln(vocabulary size) — the model spreads probability evenly because it knows nothing.
-A falling loss means real probability is being moved onto the tokens that actually occur.
+is ln(vocabulary size), because probability is spread evenly. Falling loss means real
+probability is moving onto the tokens that actually occur.
 
-**Gradient and weight update.** One real saved update from Experiment A:
+**Gradient and weight update.** One real saved update from run A:
 
 | | value |
 |---|---|
@@ -339,13 +403,12 @@ A falling loss means real probability is being moved onto the tokens that actual
 | value after | `-0.05760191` |
 | net movement | `-9.99e-06` |
 
-The gradient says which direction increases the loss; the optimizer steps the opposite
-way, scaled by the learning rate. This single step moved one of 111,872 numbers by about
-one hundred-thousandth. Training is 3,000 steps of that, across every parameter at once.
+The gradient says which direction increases the loss; the optimizer steps the opposite way,
+scaled by the learning rate. This moved one of 111,872 numbers by about one
+hundred-thousandth. Training is 3,000 such steps across every parameter at once.
 
-**Probabilities → words.** The final layer produces one score per vocabulary entry;
-softmax turns those into probabilities that sum to 1. For the prefix `the customer` in
-Experiment A:
+**Probabilities → words.** The final layer emits one score per vocabulary entry; softmax
+turns them into probabilities summing to 1. For the prefix `the customer` in run A:
 
 | Next token | Before training | After training |
 |---|---:|---:|
@@ -356,13 +419,11 @@ Experiment A:
 | `compared` | 0.00621 | 0.15966 |
 | `returned` | 0.00783 | 0.14275 |
 
-Before training everything sits near 1/136 = 0.0074. After training six verbs hold ~98% of
-the mass between them — and they are exactly the six verbs the corpus uses in
-`the {noun} {verb} the {product} after checking the price .` The model learned the frame.
-Generation samples from this distribution and appends the chosen token, then repeats.
+Before training everything sits near 1/136 = 0.0074. After, six verbs hold about 98% of the
+mass — exactly the six the corpus uses in `the {noun} {verb} the {product} after checking
+the price .` Generation samples from this distribution, appends the token, and repeats.
 
-**Attention and the causal mask.** Attention rows from the first head of the first block,
-Experiment A:
+**Attention and the causal mask.** First head, first block, run A:
 
 ```
   [1.000, 0.000, 0.000]
@@ -371,135 +432,130 @@ Experiment A:
 ```
 
 Each row is one position's mixture over earlier positions. Every row sums to 1, and the
-zeros in the upper right are the causal mask: position 1 can only see position 1,
-position 2 can see 1–2, position 3 can see 1–3. Without that mask the model could read
-the answer it is being asked to predict, and the training loss would be meaningless. This
-is also the mechanism the negation cases needed — copying a value from six tokens back is
-an attention operation — and it is what spatial relations successfully used.
+zeros on the upper right are the causal mask: position 1 sees only itself, position 2 sees
+1–2, position 3 sees 1–3. Without the mask the model could read the answer it is asked to
+predict and the loss would be meaningless. This is also the machinery the negation cases
+need — copying a value from six tokens back is an attention operation — and run C shows it
+works once the pattern is dense enough.
 
-**Temperature.** Temperature divides the scores before softmax, at generation time only.
-It changes nothing about the weights — the model is identical at all three settings.
-Full output: [temperature_comparison.json](results/extension/temperature_comparison.json).
+**Temperature.** Temperature divides the scores before softmax, at generation time only. It
+changes nothing about the weights. Full output:
+[A](results/starter/temperature_comparison.json) ·
+[B](results/extension/temperature_comparison.json) ·
+[C](results/experiment_c/temperature_comparison.json).
 
-| T | Sample from Experiment B |
+| T | Sample from run B |
 |---|---|
 | 0.3 | `the report about the orange explains the juice in detail .` |
 | 0.8 | `the customer selected the merchandise after checking the price .` |
 | 1.2 | `a district contains the drill .` |
 
-Low temperature sharpens the distribution and returns safe, high-frequency frames. High
-temperature flattens it and lets unlikely tokens through — at 1.2 the first sample loses
-its opening article entirely (`question about the local shopper…`) and `a district
-contains the drill .` mixes my land-use vocabulary with a hardware noun. Same weights,
-different sampling.
+Low temperature sharpens the distribution and returns safe, high-frequency frames; high
+temperature flattens it and lets unlikely tokens through — at 1.2 one sample loses its
+opening article entirely and another mixes land-use vocabulary with a hardware noun. Same
+weights, different sampling.
 
 ---
 
 ## 8. Samples over training
 
-Same generation settings at every checkpoint. All saved samples, including the garbled
-ones: [starter](results/starter/samples) · [extension](results/extension/samples).
+Same generation settings at every checkpoint. All saved samples, including garbled ones:
+[A](results/starter/samples) · [B](results/extension/samples) · [C](results/experiment_c/samples).
 
-**Untrained (step 0), Experiment B** — no structure at all, and an `<UNK>` in the starter run:
-
-```
-question folder creek corrected directions specific doctor platform : park travel
-lecturer floor shed directions building dog part and steel website bicycle crate
-```
-
-**Halfway (step 1500), Experiment B** — fully formed template sentences already:
+**Untrained (step 0), run C** — no structure:
 
 ```
-our kitchen has a question about the local pear and harvest .
-the customer selected the merchandise after checking the price .
+nurse software not helped willow linen animal orange orange asleep teacher uses teacher
+during corridor late professor maple is waits square banana customer
 ```
 
-**Final (step 3000), Experiment B:**
+**Final (step 3000), run C:**
 
 ```
-our hospital has a question about the local surgeon and treatment .
-the customer selected the merchandise after checking the price .
-the report about the customer explains the service in detail .
-the new peach was mentioned in the fruit report yesterday .
+the local taxi was mentioned in the journey report yesterday .
+a review of interest helped us understand the different deposit .
+a review of learning helped us understand the important lecturer .
+a review of fruit helped us understand the important pear .
 ```
 
-The visible change is between step 0 and step 1500; step 1500 to 3000 barely moves, which
-matches the loss curve flattening (0.682 → 0.678 training). What is **not** visible is any
-of the teaching material — every final sample is a classroom frame, because the classroom
-sentences are 91% of the passages. The model learned my patterns well enough to answer
-eval prompts about them but not well enough to produce them unprompted.
+Most visible change happens between step 0 and step 1500; 1500 to 3000 barely moves, which
+matches the loss curve flattening. What is **not** visible is any teaching material — every
+final sample is a classroom frame, because classroom sentences are 84% of C's passages. The
+model learned my patterns well enough to answer eval prompts about them, but not well
+enough to produce them unprompted.
 
 ---
 
 ## 9. Chat interface
 
-Two interfaces, both running the trained model from Experiment B
-(`model_sha256` `28f5aa32e559951c`, 3,000 steps):
+Two interfaces, both running trained weights from these experiments:
 
-- **Notebook** — section 10 of [`custom_llm_extension.ipynb`](custom_llm_extension.ipynb),
-  three turns with visible outputs, saved to
-  [`results/extension/chat_transcript.json`](results/extension/chat_transcript.json).
-- **Terminal** — `chat.py` against the saved weights:
+- **Notebook** — section 10 of each notebook, three turns with visible outputs, saved to
+  `chat_transcript.json` ([B](results/extension/chat_transcript.json) ·
+  [C](results/experiment_c/chat_transcript.json)).
+- **Terminal** — `chat.py` against saved weights:
 
 ```bash
-python chat.py --model results/extension/model.pt --transcript my_chat.json
+python chat.py --model results/experiment_c/model.pt --transcript my_chat.json
 ```
 
-Captured session ([raw log](results/extension/chat_terminal_session.txt) ·
-[transcript](results/extension/chat_terminal_transcript.json)):
+Run C's session (`model_sha256` `f199e83352d21f70`, 3,000 steps):
 
 ```
-Tiny language model: short continuations, not a general assistant.
-Each prompt starts fresh. Context: 48 tokens. Type /quit to exit.
-You: the parcel is not developed.it is
-Model: developed .
-You: the roof is above the floor.the floor is
-Model: above the .
-You: a robin is a bird.a salmon is a
-Model: bird .
+You: the opposite of cold is
+Model: nurse .
+You: the permit is not approved.it is
+Model: denied . the permit is filed .
 You: the design review board approved the variance
-Model: the new item .
+Model: the price .
 Unknown words: board, variance
 ```
 
-**Three of those four are failures, and they are the honest ones.** Turn 1 should have
-said *vacant* and repeated the negated value instead — the same failure the evals found.
-Turn 2 should have said *below*; note that the eval scored `lang_41` correct, because the
-eval takes the highest-probability choice among four while chat **samples** at temperature
-0.8. Same model, different procedure, different answer. Turn 3 reproduces the `bird`
-category-slot failure live. Turn 4 shows the vocabulary limit: `board` and `variance` are
-unknown, so the model sees `<UNK>` and continues with an unrelated classroom frame.
+These three turns are the whole project in miniature. **Turn 2 works** — the negation
+pattern fires correctly in land-use vocabulary, `not approved` → `denied`, then drifts on
+the second clause. **Turn 1 fails** exactly as the density table predicts: `opposites` is
+the thinnest pattern in the corpus at 0.37%, so the model falls back on classroom words and
+answers `nurse`. **Turn 3** shows the vocabulary limit — `board` and `variance` are unknown,
+so the model sees `<UNK>` and continues with an unrelated frame.
 
-This is a tiny language model. It continues text rather than answering questions, every
+Run B's captured terminal session, for comparison:
+[raw log](results/extension/chat_terminal_session.txt) ·
+[transcript](results/extension/chat_terminal_transcript.json).
+
+This is a tiny language model. It continues text rather than answering questions, each
 prompt starts fresh with no memory, the context is 48 tokens, and any word outside the
-320-entry vocabulary becomes `<UNK>`. Generating replies never updates weights and chat
-text never enters the corpus.
+407-entry vocabulary becomes `<UNK>`. Generating replies never updates weights and chat text
+never enters the corpus.
 
-> **Note for submission:** the notebook chat cells and the log above are the interface
-> evidence. If a literal PNG screenshot is wanted, open `custom_llm_extension.ipynb`,
-> scroll to section 10 and capture it.
+> **Note for submission:** the notebook chat cells and the logs above are the interface
+> evidence. If a literal PNG screenshot is wanted, open a notebook to section 10 and
+> capture it.
 
 ---
 
 ## 10. One limitation and my next experiment
 
-**Limitation.** The clearest one is the negation failure, and it is a data-design flaw
-rather than a model or budget problem. Because each subject appeared with only a few
-values, memorizing a per-subject prior was a cheaper way to reduce loss than learning the
-copy rule. 191 examples were not too few — they were too *correlated*. Behind that sits a
-broader limitation: this benchmark guided the corpus, so it measures development progress,
+**Limitation.** The sharpest one is that my own explanations kept outrunning my evidence.
+After run B I had a confident mechanistic story — the model cannot do discrimination tasks —
+that a single further run with a written-down prediction destroyed. The corpus was the
+problem, not the architecture. The lesson I would carry forward is that a plausible
+narrative fitted to one run is worth very little, and that writing the prediction down
+first is what makes the difference between an experiment and a rationalization.
+
+Behind that sits a structural limitation: this benchmark guided the corpus, run C was
+designed after reading run B's results, so these numbers measure development progress and
 not generalization.
 
-**Next experiment.** Regenerate the negation material with subject and value
-**decorrelated** — every subject appearing with every value, in both the wrong and the
-corrected role, so no per-subject prior can help and copying from context is the only way
-to reduce loss. I would hold steps and learning rate at 3,000 and 0.001 so the corpus
-remains the only variable, and predict `negation` moves off zero while `spatial_relations`
-holds at 3/3. If negation still fails under a decorrelated corpus, the limit is the
-2-block architecture rather than my data, which would be a more interesting finding.
+**Next experiment.** Hold the corpus size fixed and vary only **choice-set width**. The one
+negation case that stayed flat at 9% density is the one whose candidates are four
+interchangeable groceries; the case that scored 0.864 — the most confident correct answer
+anywhere in the suite — has only two candidates, `open` and `closed`. I would generate
+negation material with 2-, 3-, 4- and 6-member value sets at matched density and plot score
+against set width. My prediction: accuracy falls sharply with width, and the buy frame's
+failure is a choice-set effect rather than anything about groceries.
 
 The land-use corpus I originally planned — Oakland Planning Code Title 17, OPR's General
-Plan Guidelines, design review guidelines, an adopted development agreement — is the
+Plan Guidelines, design review guidelines, an adopted development agreement — remains the
 experiment after that, evaluated on perplexity over held-out planning text rather than on
 this suite, which is the wrong exam for it.
 
@@ -511,30 +567,36 @@ this suite, which is the wrong exam for it.
 uv venv --python 3.12
 uv pip install -r requirements.txt ipykernel nbformat numpy
 
-# Experiment A — empty corpus/
+# A — starter, empty corpus/
 rm -f corpus/*.md && git checkout corpus/README.md
 jupyter nbconvert --to notebook --execute --inplace custom_llm_starter.ipynb
 
-# Experiment B — generate teaching material first
+# B — extension
 python build_extension_corpus.py
 jupyter nbconvert --to notebook --execute --inplace custom_llm_extension.ipynb
 
-# Tables and neighbours
+# C — hypothesis test
+rm -f corpus/*.md && git checkout corpus/README.md
+python build_experiment_c_corpus.py
+jupyter nbconvert --to notebook --execute --inplace custom_llm_experiment_c.ipynb
+
+# Tables and embedding neighbours
 python summarize_runs.py results/starter results/extension
-python neighbors.py results/extension/checkpoint.json above bird customer
+python neighbors.py results/experiment_c/checkpoint.json above bird customer
 ```
 
-Note for Apple Silicon: a stock python.org Python 3.9 is an x86_64 build and PyTorch has
-no current wheels for it. The `uv` venv above gets a native arm64 Python 3.12.
+On Apple Silicon: a stock python.org Python 3.9 is an x86_64 build and PyTorch has no
+current wheels for it. The `uv` venv above gets a native arm64 Python 3.12.
 
 Helper scripts: [`build_extension_corpus.py`](build_extension_corpus.py) ·
+[`build_experiment_c_corpus.py`](build_experiment_c_corpus.py) ·
 [`configure_notebook.py`](configure_notebook.py) ·
 [`summarize_runs.py`](summarize_runs.py) · [`neighbors.py`](neighbors.py).
 Rerun the evals on saved weights with [`run_evals.py`](run_evals.py).
-`checkpoint.json` holds the initial and final embeddings for
+`checkpoint.json` holds initial and final embeddings for
 [`embedding-viewer.html`](embedding-viewer.html); `model.pt` holds the full network for
 inference. Neither is an exact training-resume file.
 
 The model and the 48-case suite are unmodified from the
 [sample project](https://github.com/pepealonso95/custom-llm); nanoGPT is Karpathy's, MIT
-licensed, see [`NANOGPT_LICENSE`](NANOGPT_LICENSE).
+licensed — see [`NANOGPT_LICENSE`](NANOGPT_LICENSE).
