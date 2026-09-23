@@ -352,63 +352,111 @@ use the full vector space, which is why the picture and the numbers can disagree
 
 ## 7. How this works, in the numbers from these runs
 
-*(Section to rewrite in my own words before submitting.)*
-
-Source files: `tokenization.json`
+Every figure below is read from this repository's own saved artifacts: `tokenization.json`
 ([A](results/starter/tokenization.json) · [B](results/extension/tokenization.json) ·
 [C](results/experiment_c/tokenization.json)) and `inspection.json`
 ([A](results/starter/inspection.json) · [B](results/extension/inspection.json) ·
-[C](results/experiment_c/inspection.json)).
+[C](results/experiment_c/inspection.json)). The trace follows one word, `customer`,
+through run A, whose 136-word vocabulary is small enough to inspect whole.
 
-**Corpus → passages.** A corpus is the complete and only set of text the model reads; it
-starts as random numbers with no pretrained knowledge. Long text is split into
-non-overlapping passages of at most 47 tokens at sentence boundaries, deduplicated, then
-split 90/10. C started from 7,369 chunks, 1,608 of them duplicates, leaving 5,761 unique.
+**A corpus is the only thing the model ever reads.** A corpus is the original text on which
+the model is trained. The model can only know and say words that appear in this corpus.
 
-**Tokens and IDs.** A token is one word or one punctuation mark. An ID is the row number
-that token was assigned — an arbitrary label, not a quantity. `customer` has ID **28** in
-run A and ID **85** in run B, because the vocabulary is rebuilt from each run's training
-text and sorted differently. Nothing about the word changed; only its row number did. IDs
-come **only from training text**, which is why a word appearing solely in the held-out 10%
-becomes `<UNK>` — that actually bit me in C: `hungry` and `walking` each appeared in only
-one or two passages, both landed in validation, and both vanished from the vocabulary until
-I repeated them across more sentences.
+It starts as random numbers with no pretrained knowledge. Long text is cut into passages of
+at most 47 tokens at sentence boundaries, deduplicated, then split 90/10. Run C started from
+7,369 chunks, 1,608 of them duplicates, leaving 5,761 unique. One real training passage:
 
-**Vectors and embeddings.** Each row of the embedding table is 64 numbers. That row is the
-embedding. For `customer` in run A:
+```
+today the school focused on lesson and the local professor .
+```
+
+**Tokens and token IDs are different things.** A token ID identifies a unique word, while a
+token itself is the specific instance of that word in a passage. Each word has one token ID,
+but the token can appear in many places.
+
+That passage becomes these IDs, with `<BOS>` = 1 and `<EOS>` = 2 marking where the passage
+starts and ends:
+
+```
+[1, 121, 118, 101, 42, 74, 61, 7, 118, 63, 88, 3, 2]
+```
+
+`the` appears twice and carries ID 118 both times. Tokens here are whole words and
+punctuation — not characters and not sub-word pieces.
+
+**Training is one guessing game, repeated.** The model is playing a game to predict what the
+next word is. The right answer comes from the corpus itself — it is simply the next word in
+the passage, so the answer key is the training text and nothing was labelled by hand. The
+evals play no part in this; they are a separate exam the model never studies from.
+
+Every passage becomes a column of input-and-answer pairs, the targets being the inputs
+shifted left by one:
+
+| input | target |
+|---|---|
+| `<BOS>` | today |
+| today | the |
+| the | school |
+| school | focused |
+| focused | on |
+
+**An ID is a row number, nothing more.** The ID for `customer` changes between runs because
+the vocabulary is rebuilt from scratch during each run. The ID carries no inherent meaning at
+all; it is only the address the model uses to look up that word's row.
+
+| Run | ID for `customer` | Vocabulary size |
+|---|---:|---:|
+| A | 28 | 136 |
+| B | 85 | 320 |
+| C | 86 | 407 |
+
+**Each ID points at 64 numbers.** An embedding is a vector that represents the meaning of the
+word. The numbers changed as the model refined the relationships between words.
 
 ```
 before: [-0.0576, -0.0048,  0.0426,  0.0193,  0.0156, -0.0288,  0.0256,  0.0001, …]
 after : [ 0.0366, -0.0182,  0.1330,  0.1060,  0.0630,  0.0189,  0.1523,  0.0929, …]
 ```
 
-The largest single coordinate moved 0.1616. What makes that meaningful is not the numbers
-but where the row lands relative to others: after training `customer` sits at cosine 0.980
-from `subscriber`, 0.978 from `buyer`, 0.972 from `shopper` and `consumer`, 0.969 from
-`client`. Before training its nearest neighbour was `bus` at 0.213 — noise. Nobody told the
-model these words are related; it placed them together because they share contexts.
+The largest single coordinate moved by 0.1616.
 
-**Loss.** Loss measures how surprised the model is by the actual next token. At step 0 it
-is ln(vocabulary size), because probability is spread evenly. Falling loss means real
-probability is moving onto the tokens that actually occur.
+**The numbers become meaning through their neighbours.** The model worked out the
+relationships between words simply by seeing which words occur together.
 
-**Gradient and weight update.** One real saved update from run A:
+No individual number is interpretable. What matters is which other words end up pointing the
+same way. Before training, `customer`'s nearest neighbour was `bus` at 0.213 — noise. After
+3,000 steps:
 
-| | value |
-|---|---|
-| parameter | embedding of `customer`, coordinate 0 |
-| value before | `-0.05759192` |
-| gradient | `+0.00069259` |
-| learning rate | `1e-05` (warmup — not yet 0.001) |
-| value after | `-0.05760191` |
-| net movement | `-9.99e-06` |
+| Neighbour | Cosine similarity |
+|---|---:|
+| `shopper` | 0.978 |
+| `client` | 0.977 |
+| `buyer` | 0.977 |
+| `subscriber` | 0.971 |
+| `consumer` | 0.970 |
 
-The gradient says which direction increases the loss; the optimizer steps the opposite way,
-scaled by the learning rate. This moved one of 111,872 numbers by about one
-hundred-thousandth. Training is 3,000 such steps across every parameter at once.
+Nobody told the model these words are related. They share the same contexts in the sentence
+frames, and that alone put them together.
 
-**Probabilities → words.** The final layer emits one score per vocabulary entry; softmax
-turns them into probabilities summing to 1. For the prefix `the customer` in run A:
+**Attention reads earlier words, never later ones.** The zeros in the top right mean that the
+model is only looking at the words that come before, not the ones that come after. Without
+that restriction the model could see the very word it is being asked to predict, so it would
+score perfectly during training and learn nothing.
+
+First head, first block, run A — every row sums to 1:
+
+```
+  [1.000, 0.000, 0.000]
+  [0.606, 0.394, 0.000]
+  [0.485, 0.423, 0.092]
+```
+
+**Scores become probabilities, loss, and a nudge.** The model assigns a probability to each
+word and chooses the next word from those probabilities. It then compares its prediction to
+the actual next word, and where it was wrong it adjusts so as to be less wrong next time. It
+is constantly adjusting its weights in order to minimise loss.
+
+For the prefix `the customer` in run A:
 
 | Next token | Before training | After training |
 |---|---:|---:|
@@ -419,28 +467,34 @@ turns them into probabilities summing to 1. For the prefix `the customer` in run
 | `compared` | 0.00621 | 0.15966 |
 | `returned` | 0.00783 | 0.14275 |
 
-Before training everything sits near 1/136 = 0.0074. After, six verbs hold about 98% of the
-mass — exactly the six the corpus uses in `the {noun} {verb} the {product} after checking
-the price .` Generation samples from this distribution, appends the token, and repeats.
+Before training everything sits near 1/136 = 0.0074 — uniform guessing. After, six verbs hold
+about 98% of the mass, and they are exactly the six the corpus uses in
+`the {noun} {verb} the {product} after checking the price .`
 
-**Attention and the causal mask.** First head, first block, run A:
+Loss measures that surprise as a number. At step 0 it is ln(136) = 4.91, which is what
+uniform guessing costs, and it fell to 0.678.
 
-```
-  [1.000, 0.000, 0.000]
-  [0.606, 0.394, 0.000]
-  [0.485, 0.423, 0.092]
-```
+One real saved weight update, the first one recorded:
 
-Each row is one position's mixture over earlier positions. Every row sums to 1, and the
-zeros on the upper right are the causal mask: position 1 sees only itself, position 2 sees
-1–2, position 3 sees 1–3. Without the mask the model could read the answer it is asked to
-predict and the loss would be meaningless. This is also the machinery the negation cases
-need — copying a value from six tokens back is an attention operation — and run C shows it
-works once the pattern is dense enough.
+| | value |
+|---|---|
+| parameter | embedding of `customer`, coordinate 0 |
+| value before | `-0.05759192` |
+| gradient | `+0.00069259` |
+| learning rate | `1e-05` (warmup — not yet 0.001) |
+| value after | `-0.05760191` |
+| net movement | `-9.99e-06` |
 
-**Temperature.** Temperature divides the scores before softmax, at generation time only. It
-changes nothing about the weights. Full output:
-[A](results/starter/temperature_comparison.json) ·
+The gradient says which direction would increase the loss; the optimizer steps the opposite
+way, scaled by the learning rate. That single step moved one of 111,872 numbers by about one
+hundred-thousandth, and training is 3,000 such steps across every parameter at once.
+
+**Temperature changes the sampling, not the model.** Temperature changes how random the model
+acts. Low temperature makes it give safe words, while raising it lets the model explore more.
+It applies at generation time only — the weights are identical at every setting, so nothing
+about the model has been learned or changed by turning the dial.
+
+Full output: [A](results/starter/temperature_comparison.json) ·
 [B](results/extension/temperature_comparison.json) ·
 [C](results/experiment_c/temperature_comparison.json).
 
@@ -451,9 +505,9 @@ changes nothing about the weights. Full output:
 | 1.2 | `a district contains the drill .` |
 
 Low temperature sharpens the distribution and returns safe, high-frequency frames; high
-temperature flattens it and lets unlikely tokens through — at 1.2 one sample loses its
-opening article entirely and another mixes land-use vocabulary with a hardware noun. Same
-weights, different sampling.
+temperature flattens it and lets unlikely tokens through — at 1.2 one sample loses its opening
+article entirely and another mixes land-use vocabulary with a hardware noun. Same weights,
+different sampling.
 
 ---
 
